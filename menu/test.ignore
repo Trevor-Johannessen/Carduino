@@ -1,0 +1,31 @@
+#include <stdio.h>
+#include <string.h>
+#include "menu.h"
+
+int main(int argc, char **argv){
+    char *window;
+    char *display;
+    char *test;
+
+    Menu *menu = menu_create(1, 0, 5, 10);
+    for(char i=0;i<10;i++){
+        test = malloc(sizeof(char)*strlen("Hello!")+1);
+        strcpy(test, "Hello!");
+        menu_register(menu, i, 'a'+i, test, 0x0);
+    }
+    
+    for(char i=0;i<10;i++){
+        menu_select(menu, i);
+        window = menu_window(menu);
+        printf("%s\n", window);
+        free(window);
+    }
+    for(char i=0;i<10;i++){
+        menu_select(menu, 10-i);
+        window = menu_window(menu);
+        printf("%s\n", window);
+        free(window);
+    }
+
+    menu_free(menu, 0);
+}
