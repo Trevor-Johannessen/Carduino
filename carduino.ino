@@ -1,5 +1,17 @@
 #include <LiquidCrystal.h>
+#include <FastLED.h>
 #include <menu.h>
+#include <string.h>
+
+// LED
+#define LED_PIN     2
+#define NUM_LEDS    300 // Change this to the number of LEDs you have
+#define BRIGHTNESS  64
+#define LED_TYPE    WS2812B
+#define COLOR_ORDER GRB
+CRGB leds[NUM_LEDS];
+CRGB primary;
+CRGB secondary;
 
 // LCD
 const int rs=3,
@@ -22,6 +34,7 @@ unsigned long current_time, btn1_last_pressed, btn2_last_pressed, btn3_last_pres
 #define MENU_WINDOW 8
 #define MENU_SIZE 3
 #define COLOR_SIZE 9
+#define COLOR_STATE_SIZE 3
 #define PATTERN_SIZE 7
 Menu *menu;
 const char *status[MENU_SIZE] = {
@@ -39,6 +52,10 @@ const char *color_strings[COLOR_SIZE] = {
   "Purple",
   "White"
 };
+const char *color_states[COLOR_STATE_SIZE] = {
+  "Primary",
+  "Second"
+};
 const char *pattern_strings[PATTERN_SIZE] = {
   "Solid",
   "Flash",
@@ -49,21 +66,30 @@ const char *pattern_strings[PATTERN_SIZE] = {
 };
 char *back = "Back";
 char *window;
+char state;
 
 void showButton(char btn);
 char get_menu_size(char icon);
 void populate_menu(Menu *menu, char icon);
 void populate_menu_main(Menu *menu);
+void populate_menu_color_state(Menu *menu);
 void populate_menu_color(Menu *menu);
 void populate_menu_pattern(Menu *menu);
 void change_menu(char icon, char *desc);
 void menu_draw(Menu *menu);
+void color_set(char icon, char *color);
 
+
+/*
+      ----- MENUS -----
+*/
 
 char get_menu_size(char icon){
   switch(icon){
-    case 'c':
+    case 'C':
       return COLOR_SIZE;
+    case 'c':
+      return COLOR_STATE_SIZE;
     case 'p':
       return PATTERN_SIZE;
     case 'm':
@@ -77,6 +103,9 @@ char get_menu_size(char icon){
 void populate_menu(Menu *menu, char icon){
   switch(icon){
     case 'c':
+      populate_menu_color_state(menu);
+      break;
+    case 'C':
       populate_menu_color(menu);
       break;
     case 'p':
@@ -107,16 +136,22 @@ void populate_menu_main(Menu *menu){
   menu_register(menu, 2, 'o', status[2], 0x0);
 }
 
+void populate_menu_color_state(Menu *menu){
+  menu_register(menu, 0, 'b', back, change_menu);
+  menu_register(menu, 1, 'p', color_states[0], color_set_state);
+  menu_register(menu, 2, 's', color_states[1], color_set_state);
+}
+
 void populate_menu_color(Menu *menu){
   menu_register(menu, 0, 'b', back, change_menu);
-  menu_register(menu, 1, 'r', color_strings[0], 0x0);
-  menu_register(menu, 2, 'p', color_strings[1], 0x0);
-  menu_register(menu, 3, 'o', color_strings[2], 0x0);
-  menu_register(menu, 4, 'y', color_strings[3], 0x0);
-  menu_register(menu, 5, 'g', color_strings[4], 0x0);
-  menu_register(menu, 6, 'b', color_strings[5], 0x0);
-  menu_register(menu, 7, 'p', color_strings[6], 0x0);
-  menu_register(menu, 8, 'w', color_strings[7], 0x0);
+  menu_register(menu, 1, 'r', color_strings[0], color_set);
+  menu_register(menu, 2, 'p', color_strings[1], color_set);
+  menu_register(menu, 3, 'o', color_strings[2], color_set);
+  menu_register(menu, 4, 'y', color_strings[3], color_set);
+  menu_register(menu, 5, 'g', color_strings[4], color_set);
+  menu_register(menu, 6, 'b', color_strings[5], color_set);
+  menu_register(menu, 7, 'p', color_strings[6], color_set);
+  menu_register(menu, 8, 'w', color_strings[7], color_set);
 }
 
 void populate_menu_pattern(Menu *menu){
@@ -139,11 +174,68 @@ void menu_draw(Menu *menu){
   free(window);
 }
 
+/*
+      ----- COLORS -----
+*/
+
+void color_set_state(char icon, char *desc){
+  state = icon;
+  change_menu('C', desc);
+}
+
+void color_set(char icon, char *color_string){
+  CRGB color;
+  if(!strcmp(color_string, "Red"))
+    color = CRGB::Red;
+  else if(!strcmp(color_string, "Blue"))
+    color = CRGB::Blue;
+  else if(!strcmp(color_string, "Green"))
+    color = CRGB::Green;
+  else if(!strcmp(color_string, "Yellow"))
+    color = CRGB::Yellow;
+  else if(!strcmp(color_string, "Pink"))
+    color = CRGB::Pink;
+  else if(!strcmp(color_string, "Orange"))
+    color = CRGB::Orange;
+  else if(!strcmp(color_string, "Purple"))
+    color = CRGB::Purple;
+  else if(!strcmp(color_string, "White"))
+    color = CRGB::White;
+  else
+    color = CRGB::Black;
+
+  Serial.print("Set ");
+  if(state=='p'){
+    primary = color;
+    Serial.print("primary to ");
+  }
+  else if(state=='s'){
+    secondary = color;
+    Serial.print("secondary to ");
+  }
+  Serial.println(color_string);
+  state=0;
+  change_menu('m', 'Main');
+}
+
+/*
+      ----- CONTROL -----
+*/
+
 void setup() {
   delay(3000);
+  state=0;
 
   Serial.begin(9600);
   Serial.print("STARTING...\n");
+
+  // LED
+  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.setBrightness(BRIGHTNESS);
+  for(int i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CRGB::Black;
+  }
+  FastLED.show();
 
   // LCD
   lcd.begin(16, 2);
@@ -171,25 +263,11 @@ void loop() {
   if(btn1_state == HIGH && current_time - btn1_last_pressed > BUTTON_THRESHOLD){
     btn1_last_pressed = current_time;
     menu_select(menu, menu->cursor-1);
-    // window = menu_window(menu);
-    // Serial.print(window);
-    // Serial.print(": ");
-    // Serial.print(menu->cursor+1, DEC);
-    // Serial.print(" -> ");
-    // Serial.println(menu->cursor, DEC);
-    // free(window);
     modified = 1;
   }
   if(btn2_state == HIGH && current_time - btn2_last_pressed > BUTTON_THRESHOLD){
     btn2_last_pressed = current_time;
     menu_select(menu, menu->cursor+1);
-    // window = menu_window(menu);
-    // Serial.print(window);
-    // Serial.print(": ");
-    // Serial.print(menu->cursor-1, DEC);
-    // Serial.print(" -> ");
-    // Serial.println(menu->cursor, DEC);
-    // free(window);
     modified = 1;
   }
   if(btn3_state == HIGH && current_time - btn3_last_pressed > BUTTON_THRESHOLD){
@@ -199,6 +277,4 @@ void loop() {
   if(modified){
     menu_draw(menu);
   }
-  // lcd.setCursor(menu->x, menu->y+1);
-  // lcd.print(menu_message(menu));
 }
